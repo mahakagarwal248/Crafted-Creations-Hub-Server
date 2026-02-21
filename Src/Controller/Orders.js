@@ -4,7 +4,7 @@ import OrderModel from "../Models/Orders.js";
 import TransactionModel from "../Models/Transactions.js";
 import ProductModel from '../Models/Products.js';
 import mongoose from 'mongoose';
-import userModel from '../Models/users.js';
+import userModel from '../Models/Users.js';
 
 export const addOrder = async (req, res) => {
     try {
