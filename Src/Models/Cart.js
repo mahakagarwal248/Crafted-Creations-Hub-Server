@@ -10,6 +10,7 @@ const cartItemSchema = new mongoose.Schema({
 const cartSchema = new mongoose.Schema(
   {
     cartId: { type: String, required: true, unique: true },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     items: [cartItemSchema],
   },
   { timestamps: true }
