@@ -27,6 +27,11 @@ const userScehma = new mongoose.Schema(
       state: String,
       zip: String,
     },
+    role: {
+      type: String,
+      enum: ["user", "admin"],
+      default: "user",
+    },
   },
   { timestamps: true } // auto adds createdAt & updatedAt
 );

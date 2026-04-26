@@ -29,7 +29,12 @@ const productSchema = new mongoose.Schema(
       trim: true,
     },
     imageUrl: {
-      type: String, // store image link or path
+      type: String, // legacy single image link or path
+    },
+    /** Base64 data URLs (e.g. data:image/jpeg;base64,...) or https URLs */
+    photos: {
+      type: [String],
+      default: [],
     },
     minDaysToDispatch: {
         type: Number

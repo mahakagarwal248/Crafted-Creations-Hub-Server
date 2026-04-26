@@ -9,9 +9,14 @@ const OrderSchema = new mongoose.Schema(
       type: Number,
       unique: true,
     },
+    /** Logged-in shopper (same as legacy customerId) */
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
     customerId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Customer",
+      ref: "User",
     },
     items: [
       {

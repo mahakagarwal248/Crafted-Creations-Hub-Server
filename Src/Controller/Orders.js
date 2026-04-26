@@ -1,53 +1,68 @@
 import moment from 'moment';
+import mongoose from "mongoose";
 
 import OrderModel from "../Models/Orders.js";
 import TransactionModel from "../Models/Transactions.js";
 import ProductModel from '../Models/Products.js';
-import mongoose from 'mongoose';
 import userModel from '../Models/Users.js';
 
 export const addOrder = async (req, res) => {
     try {
     const { productDetails, customerId, discount = 0, amountPaid = 0 } = req.body;
 
-    console.log(req.body)
-    // Basic validation
-    if (!productDetails) {
+    if (!productDetails || !Array.isArray(productDetails) || productDetails.length === 0) {
       return res.status(400).json({ success: false, message: "Invalid product id or quantity" });
     }
-
-    let customerData = await userModel.findOne({_id: customerId})
-
-    if(!customerData) throw { Status: "Error", Message: "Invalid customer id!"}
-    let allItems = [];
-    let totalAmount = 0
-    for(let product of productDetails){
-        let productData = await ProductModel.findOne({productId: product.productId});
-        console.log(productData)
-        if(productData){
-            totalAmount = (totalAmount + productData.price) * Number(product.quantity)
-            allItems.push({
-                productId: productData.id,
-                name: productData.name,
-                price: productData.price,
-                quantity:Number(product.quantity),
-                discount: Number(discount),
-                amountPayable: Number((productData?.price *Number(product.quantity)) - ((productData?.price *Number(product.quantity) * Number(discount)) / 100))
-            })
-        }
+    if (!customerId) {
+      return res.status(400).json({ success: false, message: "User is required to place an order." });
     }
-    let amountPayable = totalAmount - (totalAmount * (Number(discount) / 100)) || 0;
+
+    const customerData = await userModel.findById(customerId).lean();
+    if (!customerData) {
+      return res.status(400).json({ success: false, message: "Invalid customer id." });
+    }
+
+    const disc = Number(discount) || 0;
+    const allItems = [];
+    let totalAmount = 0;
+
+    for (const product of productDetails) {
+      const pid = Number(product.productId);
+      const qty = Math.max(1, Number(product.quantity) || 1);
+      const productData = await ProductModel.findOne({ productId: pid });
+      if (!productData) continue;
+      const lineSubtotal = productData.price * qty;
+      totalAmount += lineSubtotal;
+      const lineAfterDiscount = lineSubtotal - (lineSubtotal * disc) / 100;
+      allItems.push({
+        productId: productData._id,
+        name: productData.name,
+        price: productData.price,
+        quantity: qty,
+        discount: disc,
+        amountPayable: Number(lineAfterDiscount.toFixed(2)),
+      });
+    }
+
+    if (allItems.length === 0) {
+      return res.status(400).json({ success: false, message: "No valid products in order." });
+    }
+
+    const amountPayable = Number((totalAmount - (totalAmount * disc) / 100).toFixed(2));
+    const paid = Number(amountPaid) || 0;
+
     const obj = {
-        customerId, 
+        userId: customerData._id,
+        customerId: customerData._id,
         items: allItems,
-        totalAmount: totalAmount,
-        discount,
+        totalAmount,
+        discount: disc,
         amountPayable,
-        amountPaid: Number(amountPaid),
-        pendingAmount: Number(amountPayable) - Number(amountPaid),
+        amountPaid: paid,
+        pendingAmount: Number((amountPayable - paid).toFixed(2)),
         shippingAddress: customerData.shippingAddress,
         placedAt: new Date()
-    }
+    };
 
     console.log(obj)
     let newOrder = await OrderModel.create(obj)
@@ -123,6 +138,27 @@ export const getOrders = async (req, res) => {
     return res.status(500).json(error);
   }
 }
+
+/** Orders placed by a specific user (checkout / storefront). */
+export const getOrdersForUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ success: false, message: "Invalid user id." });
+    }
+    const oid = new mongoose.Types.ObjectId(userId);
+    const orders = await OrderModel.find({
+      $or: [{ userId: oid }, { customerId: oid }],
+    })
+      .sort({ placedAt: -1 })
+      .lean();
+
+    return res.status(200).json(orders);
+  } catch (error) {
+    console.error("getOrdersForUser:", error);
+    return res.status(500).json({ success: false, message: "Failed to fetch orders." });
+  }
+};
 
 const allowedStatuses = ["PENDING", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"];
 

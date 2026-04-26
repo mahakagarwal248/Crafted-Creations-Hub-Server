@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import path from "path";
 import dotenv from "dotenv";
 import router from "./Src/Routes/index.js"; // add `.js` for ES modules
+import { syncProductIdCounterFromProducts } from "./Src/Utils/syncProductIdCounter.js";
 import { fileURLToPath } from "url";
 import morgan from "morgan";
 import cors from 'cors';
@@ -13,8 +14,8 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
-app.use(express.json());
+// Middleware (larger limit for product photo payloads as base64 JSON)
+app.use(express.json({ limit: "20mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // MongoDB Connection
@@ -25,8 +26,22 @@ mongoose
     // useNewUrlParser: true,
     // useUnifiedTopology: true,
   })
-  .then(() => console.log("✅ Connected to MongoDB"))
-  .catch((err) => console.error("❌ MongoDB connection error:", err));
+  .then(async () => {
+    console.log("✅ Connected to MongoDB");
+    try {
+      await syncProductIdCounterFromProducts();
+      console.log("✅ productId counter synced with products");
+    } catch (e) {
+      console.error("⚠️ productId counter sync failed:", e);
+    }
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running at http://localhost:${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error("❌ MongoDB connection error:", err);
+    process.exit(1);
+  });
 
 // Serve static files (optional - frontend like index.html, css, js)
 const __filename = fileURLToPath(import.meta.url);
@@ -47,7 +62,3 @@ app.get("/api/test", async (req, res) => {
   res.json({ status: "success", db: mongoose.connection.readyState });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`🚀 Server running at http://localhost:${PORT}`);
-});
