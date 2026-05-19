@@ -24,9 +24,8 @@ const productSchema = new mongoose.Schema(
       min: 0,
     },
     category: {
-      type: String,
-      required: true,
-      trim: true,
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Category" }],
+      default: [],
     },
     imageUrl: {
       type: String, // legacy single image link or path
@@ -38,7 +37,11 @@ const productSchema = new mongoose.Schema(
     },
     minDaysToDispatch: {
         type: Number
-    }
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
   },
   { timestamps: true } // auto adds createdAt & updatedAt
 );

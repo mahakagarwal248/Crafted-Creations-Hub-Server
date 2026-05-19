@@ -111,33 +111,58 @@ export const addExpenses = async (req, res) => {
     }
 }
 
+function parsePagination(req, defaultLimit = 10) {
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || defaultLimit));
+  return { page, limit, skip: (page - 1) * limit };
+}
+
 export const getExpenses = async (req, res) => {
   try {
-    let query = { type: "expense" }
-    let allExpenses = await TransactionModel.find(query);
-    
-    if(!allExpenses) throw { Status: "Error", Message: "Error in fetching expenses"}
+    const query = { type: "expense" };
+    const { page, limit, skip } = parsePagination(req);
+    const totalCount = await TransactionModel.countDocuments(query);
+    const items = await TransactionModel.find(query)
+      .sort({ date: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
 
-    return res.status(200).json(allExpenses)
+    return res.status(200).json({
+      items,
+      page,
+      limit,
+      totalCount,
+      totalPages: Math.max(1, Math.ceil(totalCount / limit)),
+    });
   } catch (error) {
-    console.error("Error adding transaction:", error);
+    console.error("Error fetching expenses:", error);
     return res.status(500).json(error);
   }
-}
+};
 
 export const getOrders = async (req, res) => {
   try {
-    // let query = { type: "expense" }
-    let allOrders = await OrderModel.find().lean();
-    
-    if(!allOrders) throw { Status: "Error", Message: "Error in fetching expenses"}
+    const { page, limit, skip } = parsePagination(req);
+    const totalCount = await OrderModel.countDocuments();
+    const items = await OrderModel.find()
+      .sort({ placedAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
 
-    return res.status(200).json(allOrders)
+    return res.status(200).json({
+      items,
+      page,
+      limit,
+      totalCount,
+      totalPages: Math.max(1, Math.ceil(totalCount / limit)),
+    });
   } catch (error) {
-    console.error("Error adding transaction:", error);
+    console.error("Error fetching orders:", error);
     return res.status(500).json(error);
   }
-}
+};
 
 /** Orders placed by a specific user (checkout / storefront). */
 export const getOrdersForUser = async (req, res) => {

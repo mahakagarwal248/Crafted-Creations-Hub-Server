@@ -5,6 +5,7 @@ import path from "path";
 import dotenv from "dotenv";
 import router from "./Src/Routes/index.js"; // add `.js` for ES modules
 import { syncProductIdCounterFromProducts } from "./Src/Utils/syncProductIdCounter.js";
+import { migrateLegacyProductCategories } from "./Src/Utils/productCategories.js";
 import { fileURLToPath } from "url";
 import morgan from "morgan";
 import cors from 'cors';
@@ -33,6 +34,14 @@ mongoose
       console.log("✅ productId counter synced with products");
     } catch (e) {
       console.error("⚠️ productId counter sync failed:", e);
+    }
+    try {
+      const migrated = await migrateLegacyProductCategories();
+      if (migrated > 0) {
+        console.log(`✅ migrated legacy categories on ${migrated} product(s)`);
+      }
+    } catch (e) {
+      console.error("⚠️ legacy category migration failed:", e);
     }
     app.listen(PORT, () => {
       console.log(`🚀 Server running at http://localhost:${PORT}`);

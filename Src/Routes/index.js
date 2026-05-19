@@ -1,5 +1,6 @@
 import express from "express";
 import productRoutes from './products.js';
+import categoryRoutes from './categories.js';
 import orderRoutes from './Orders.js';
 import userRoutes from './users.js';
 import cartRoutes from './Cart.js';
@@ -12,6 +13,7 @@ router.get("/", (req, res) => {
 });
 
 router.use('/product', productRoutes);
+router.use('/category', categoryRoutes);
 router.use('/orders', orderRoutes);
 router.use('/users', userRoutes);
 router.use('/carts', cartRoutes);
