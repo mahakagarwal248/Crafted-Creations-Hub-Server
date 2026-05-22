@@ -8,10 +8,20 @@ import userModel from '../Models/Users.js';
 
 export const addOrder = async (req, res) => {
     try {
-    const { productDetails, customerId, discount = 0, amountPaid = 0 } = req.body;
+    const { productDetails, discount = 0, amountPaid = 0 } = req.body;
+    let { customerId } = req.body;
 
     if (!productDetails || !Array.isArray(productDetails) || productDetails.length === 0) {
       return res.status(400).json({ success: false, message: "Invalid product id or quantity" });
+    }
+
+    // Authenticated users can only place orders for themselves; admins may place on behalf of another customer.
+    if (req.user) {
+      if (req.user.role !== "admin") {
+        customerId = req.user.id;
+      } else if (!customerId) {
+        customerId = req.user.id;
+      }
     }
     if (!customerId) {
       return res.status(400).json({ success: false, message: "User is required to place an order." });
@@ -145,11 +155,26 @@ export const getOrders = async (req, res) => {
   try {
     const { page, limit, skip } = parsePagination(req);
     const totalCount = await OrderModel.countDocuments();
-    const items = await OrderModel.find()
-      .sort({ placedAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean();
+    const items = await OrderModel.aggregate([
+      { $sort: { placedAt: -1 } },
+      { $skip: skip },
+      { $limit: limit },
+      {
+        $lookup: {
+          from: "invoices",
+          localField: "_id",
+          foreignField: "orderId",
+          as: "_invoice",
+        },
+      },
+      {
+        $addFields: {
+          invoiceNumber: { $arrayElemAt: ["$_invoice.invoiceNumber", 0] },
+          hasInvoice: { $gt: [{ $size: "$_invoice" }, 0] },
+        },
+      },
+      { $project: { _invoice: 0 } },
+    ]);
 
     return res.status(200).json({
       items,
@@ -172,11 +197,25 @@ export const getOrdersForUser = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid user id." });
     }
     const oid = new mongoose.Types.ObjectId(userId);
-    const orders = await OrderModel.find({
-      $or: [{ userId: oid }, { customerId: oid }],
-    })
-      .sort({ placedAt: -1 })
-      .lean();
+    const orders = await OrderModel.aggregate([
+      { $match: { $or: [{ userId: oid }, { customerId: oid }] } },
+      { $sort: { placedAt: -1 } },
+      {
+        $lookup: {
+          from: "invoices",
+          localField: "_id",
+          foreignField: "orderId",
+          as: "_invoice",
+        },
+      },
+      {
+        $addFields: {
+          invoiceNumber: { $arrayElemAt: ["$_invoice.invoiceNumber", 0] },
+          hasInvoice: { $gt: [{ $size: "$_invoice" }, 0] },
+        },
+      },
+      { $project: { _invoice: 0 } },
+    ]);
 
     return res.status(200).json(orders);
   } catch (error) {

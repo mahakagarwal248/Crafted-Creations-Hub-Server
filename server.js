@@ -5,6 +5,7 @@ import path from "path";
 import dotenv from "dotenv";
 import router from "./Src/Routes/index.js"; // add `.js` for ES modules
 import { syncProductIdCounterFromProducts } from "./Src/Utils/syncProductIdCounter.js";
+import { syncInvoiceCounterFromInvoices } from "./Src/Utils/invoiceCounter.js";
 import { migrateLegacyProductCategories } from "./Src/Utils/productCategories.js";
 import { fileURLToPath } from "url";
 import morgan from "morgan";
@@ -43,6 +44,12 @@ mongoose
     } catch (e) {
       console.error("⚠️ legacy category migration failed:", e);
     }
+    try {
+      await syncInvoiceCounterFromInvoices();
+      console.log("✅ invoice counter synced with invoices");
+    } catch (e) {
+      console.error("⚠️ invoice counter sync failed:", e);
+    }
     app.listen(PORT, () => {
       console.log(`🚀 Server running at http://localhost:${PORT}`);
     });
@@ -58,8 +65,8 @@ const __dirname = path.dirname(__filename);
 
 app.use(express.static(path.join(__dirname, "public")));
 app.use(cors())
-app.use('/api', router);
 app.use(morgan('combined'))
+app.use('/api', router);
 
 // Basic route
 app.get("/", (req, res) => {

@@ -7,13 +7,16 @@ import {
   updateProduct,
   updateProductActive,
 } from "../Controller/Products.js";
+import { requireAdmin, requireAuth } from "../Middleware/auth.js";
+
 const router = express.Router();
 
-router.post("/", addProduct);
-router.get("/list", listProducts);
+router.get("/list", requireAuth, requireAdmin, listProducts);
 router.get("/", getProducts);
-router.patch("/:productId/active", updateProductActive);
-router.put("/:productId", updateProduct);
 router.get("/:productId", getProductById);
+
+router.post("/", requireAuth, requireAdmin, addProduct);
+router.patch("/:productId/active", requireAuth, requireAdmin, updateProductActive);
+router.put("/:productId", requireAuth, requireAdmin, updateProduct);
 
 export default router;

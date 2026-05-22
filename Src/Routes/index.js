@@ -5,8 +5,12 @@ import orderRoutes from './Orders.js';
 import userRoutes from './users.js';
 import cartRoutes from './Cart.js';
 import checkoutRoutes from './Checkout.js';
+import reviewRoutes from './Review.js';
+import { attachUser } from '../Middleware/auth.js';
 
 const router = express.Router();
+
+router.use(attachUser);
 
 router.get("/", (req, res) => {
   res.send("Welcome to the Node.js API!");
@@ -18,5 +22,6 @@ router.use('/orders', orderRoutes);
 router.use('/users', userRoutes);
 router.use('/carts', cartRoutes);
 router.use('/checkout', checkoutRoutes);
+router.use('/reviews', reviewRoutes);
 
 export default router;
