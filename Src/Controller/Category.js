@@ -1,6 +1,8 @@
 import mongoose from "mongoose";
+import moment from "moment";
 import CategoryModel from "../Models/Category.js";
 import ProductModel from "../Models/Products.js";
+import { streamCategoryCatalogPdf } from "../Utils/generateCategoryCatalogPdf.js";
 
 const MAX_HOMEPAGE_FEATURED = 5;
 const MAX_CATEGORY_IMAGE_LENGTH = 6 * 1024 * 1024;
@@ -25,6 +27,7 @@ export const createCategory = async (req, res) => {
     const name = req.body?.name?.trim();
     const description = req.body?.description?.trim();
     const isOccasional = parseBoolean(req.body?.isOccasional);
+    const isDynamicPriceCategory = parseBoolean(req.body?.isDynamicPriceCategory);
     const imageUrl = normalizeCategoryImage(req.body?.imageUrl);
     if (!name) {
       return res.status(400).json({ message: "Category name is required" });
@@ -36,6 +39,7 @@ export const createCategory = async (req, res) => {
       name,
       description,
       isOccasional: isOccasional ?? false,
+      isDynamicPriceCategory: isDynamicPriceCategory ?? false,
       ...(imageUrl !== undefined ? { imageUrl } : {}),
     });
     return res.status(201).json(category);
@@ -149,11 +153,15 @@ export const updateCategory = async (req, res) => {
     const name = req.body?.name?.trim();
     const description = req.body?.description?.trim();
     const isOccasional = parseBoolean(req.body?.isOccasional);
+    const isDynamicPriceCategory = parseBoolean(req.body?.isDynamicPriceCategory);
     const imageUrl = normalizeCategoryImage(req.body?.imageUrl);
     const update = {};
     if (name) update.name = name;
     if (description !== undefined) update.description = description;
     if (typeof isOccasional === "boolean") update.isOccasional = isOccasional;
+    if (typeof isDynamicPriceCategory === "boolean") {
+      update.isDynamicPriceCategory = isDynamicPriceCategory;
+    }
     if (imageUrl !== undefined) {
       if (imageUrl === null) {
         return res.status(400).json({ message: "Category image is too large (max ~4 MB)" });
@@ -177,6 +185,52 @@ export const updateCategory = async (req, res) => {
     }
     console.log(error);
     return res.status(500).json(error);
+  }
+};
+
+function sanitizeFileName(value) {
+  return String(value || "category")
+    .replace(/[^a-zA-Z0-9-_]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 60) || "category";
+}
+
+export const downloadCategoryCatalogue = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid category id" });
+    }
+    const category = await CategoryModel.findById(id).lean();
+    if (!category) {
+      return res.status(404).json({ message: "Category not found" });
+    }
+
+    const products = await ProductModel.find({
+      category: new mongoose.Types.ObjectId(id),
+      isActive: { $ne: false },
+    })
+      .sort({ productId: -1 })
+      .lean();
+
+    const fileName = `catalogue-${sanitizeFileName(category.name)}.pdf`;
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+    res.setHeader("Cache-Control", "no-store");
+
+    streamCategoryCatalogPdf({
+      res,
+      category,
+      products,
+      generatedOn: moment().format("DD MMM YYYY, HH:mm"),
+      showStartingFrom: Boolean(category.isDynamicPriceCategory),
+    });
+  } catch (error) {
+    console.log(error);
+    if (!res.headersSent) {
+      return res.status(500).json({ message: "Could not generate catalogue PDF" });
+    }
+    try { res.end(); } catch { /* ignore */ }
   }
 };
 

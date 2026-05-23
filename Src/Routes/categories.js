@@ -7,6 +7,7 @@ import {
   getCategoryById,
   updateCategory,
   deleteCategory,
+  downloadCategoryCatalogue,
 } from "../Controller/Category.js";
 import { requireAdmin, requireAuth } from "../Middleware/auth.js";
 
@@ -14,6 +15,7 @@ const router = express.Router();
 
 router.get("/featured/homepage", getFeaturedHomepageCategories);
 router.get("/", getCategories);
+router.get("/:id/catalogue.pdf", requireAuth, requireAdmin, downloadCategoryCatalogue);
 router.get("/:id", getCategoryById);
 
 router.put("/featured/homepage", requireAuth, requireAdmin, setFeaturedHomepageCategories);

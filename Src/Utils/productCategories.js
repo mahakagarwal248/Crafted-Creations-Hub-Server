@@ -40,7 +40,7 @@ export async function attachPopulatedCategories(productOrList) {
     ? await CategoryModel.find({
         _id: { $in: idStrings.map((id) => new mongoose.Types.ObjectId(id)) },
       })
-        .select("name description")
+        .select("name description isDynamicPriceCategory")
         .lean()
     : [];
   const byId = new Map(categories.map((c) => [c._id.toString(), c]));

@@ -20,6 +20,11 @@ const categorySchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    /** When true, products in this category should display prices as "Starting from ₹X" */
+    isDynamicPriceCategory: {
+      type: Boolean,
+      default: false,
+    },
     /** 1–5 = pinned slot on homepage; null = not featured */
     homepageOrder: {
       type: Number,
