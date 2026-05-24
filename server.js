@@ -9,25 +9,45 @@ import { syncInvoiceCounterFromInvoices } from "./Src/Utils/invoiceCounter.js";
 import { migrateLegacyProductCategories } from "./Src/Utils/productCategories.js";
 import { fileURLToPath } from "url";
 import morgan from "morgan";
-import cors from 'cors';
+import cors from "cors";
 
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 
-// Middleware (larger limit for product photo payloads as base64 JSON)
+// Middleware (declare BEFORE routes / listen so order is deterministic).
+app.use(cors());
+app.use(morgan("combined"));
 app.use(express.json({ limit: "20mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-// MongoDB Connection
+// Serve static files (optional - frontend like index.html, css, js)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+app.use(express.static(path.join(__dirname, "public")));
+
+app.use("/api", router);
+
+app.get("/", (_req, res) => {
+  res.send("Hello, Node.js app with MongoDB is running!");
+});
+
+app.get("/api/test", async (_req, res) => {
+  res.json({ status: "success", db: mongoose.connection.readyState });
+});
+
+// Start listening immediately so the API is reachable even if Mongo is slow
+// to connect. Requests that need the DB will just wait on Mongoose's buffer.
+app.listen(PORT, () => {
+  console.log(`🚀 Server running at http://localhost:${PORT}`);
+});
+
+// Connect to MongoDB and run startup sync tasks in the background.
 const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/myapp";
 
 mongoose
-  .connect(MONGO_URI, {
-    // useNewUrlParser: true,
-    // useUnifiedTopology: true,
-  })
+  .connect(MONGO_URI)
   .then(async () => {
     console.log("✅ Connected to MongoDB");
     try {
@@ -50,31 +70,17 @@ mongoose
     } catch (e) {
       console.error("⚠️ invoice counter sync failed:", e);
     }
-    app.listen(PORT, () => {
-      console.log(`🚀 Server running at http://localhost:${PORT}`);
-    });
   })
   .catch((err) => {
-    console.error("❌ MongoDB connection error:", err);
-    process.exit(1);
+    // Don't kill the process — keep serving non-DB routes and let Mongoose
+    // retry the connection in the background.
+    console.error("❌ MongoDB connection error:", err?.message || err);
   });
 
-// Serve static files (optional - frontend like index.html, css, js)
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-app.use(express.static(path.join(__dirname, "public")));
-app.use(cors())
-app.use(morgan('combined'))
-app.use('/api', router);
-
-// Basic route
-app.get("/", (req, res) => {
-  res.send("Hello, Node.js app with MongoDB is running!");
+mongoose.connection.on("disconnected", () => {
+  console.warn("⚠️ MongoDB disconnected — Mongoose will keep trying to reconnect.");
 });
 
-// Example API route (to check DB)
-app.get("/api/test", async (req, res) => {
-  res.json({ status: "success", db: mongoose.connection.readyState });
+mongoose.connection.on("reconnected", () => {
+  console.log("🔁 MongoDB reconnected.");
 });
-
